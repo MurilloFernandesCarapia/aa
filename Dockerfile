@@ -24,10 +24,11 @@ RUN dotnet publish "PetCare360.API.csproj" -c Release -o /app/publish /p:UseAppH
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Cria um grupo e usuario nao-root chamado 'appuser' (UID/GID 1000).
-# A app vai rodar com esse usuario -> evita penalidade de -0,5 ponto.
-RUN groupadd -r appuser -g 1000 && \
-    useradd -r -u 1000 -g appuser -m -s /sbin/nologin appuser
+# Cria um grupo e usuario nao-root chamado 'appuser'.
+# Nao fixamos UID/GID para evitar conflito com usuarios pre-existentes
+# na imagem base (Debian 12 ja tem um 'app' no GID 1000).
+RUN groupadd --system appuser && \
+    useradd --system --gid appuser --create-home --shell /sbin/nologin appuser
 
 # Copia o resultado do publish do estagio anterior.
 COPY --from=build /app/publish .
