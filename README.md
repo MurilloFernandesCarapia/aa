@@ -138,7 +138,7 @@ Existem duas formas de pôr esse projeto pra rodar. A primeira é rodar local na
  
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/MurilloFernandesCarapia/aa.git
+   git clone https://github.com/MurilloFernandesCarapia/Challenge-Devops.git
    cd aa
    ```
  
@@ -215,7 +215,7 @@ Sai da VM com `exit` e entra de novo (`ssh rm564969@4.168.192.201`) pra que o gr
 **Passo 4: clonar o repositório e subir a aplicação**
 
 ```bash
-git clone https://github.com/MurilloFernandesCarapia/aa.git
+git clone https://github.com/MurilloFernandesCarapia/Challenge-Devops.git
 cd aa
 docker compose up -d
 ```
