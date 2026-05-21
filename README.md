@@ -1,257 +1,110 @@
-# PetCare 360 — API .NET
+# PetCare 360 — Containerização em Nuvem
 
-API .NET do projeto **PetCare 360**, que estou desenvolvendo no Challenge 2026 da FIAP em parceria com a CLYVO VET.
+Esse repositório é a **entrega da disciplina de DevOps Tools & Cloud Computing** (1º Sprint do Challenge 2026). A ideia da entrega é pegar uma API que já existe — a do nosso projeto PetCare 360 (Challenge FIAP/CLYVO VET) — e colocar ela pra rodar em nuvem, dentro de containers Docker, com banco também conteinerizado.
 
-A ideia é resolver um problema que qualquer dono de pet conhece: hoje a saúde do bicho vive aos pedaços. Tutor vai na clínica só quando o pet adoece, esquece vacina, perde a carteirinha, troca de clínica e o histórico fica perdido. O PetCare 360 tenta juntar tutor, pet, clínica e atendimentos num lugar só — cadastros, consultas, vacinas, medicamentos e o histórico completo de cada animal.
+A API em si foi desenvolvida na disciplina de **Advanced Business Development with .NET**. Aqui o foco é outro: provar que conseguimos tirar a aplicação do "rodando no meu PC" e colocar ela em uma máquina virtual Azure, isolada em containers, com persistência de dados, sem nada amarrado no localhost.
 
-Esta API é o núcleo de cadastro: toda informação principal passa por aqui antes de ir pro app mobile.
-
-## Quem fez
-
-Sou o Murillo, da turma **2TDSPW** (2º ano de ADS na FIAP). Nesse grupo eu fiquei responsável pelas APIs do projeto (.NET e Java). Os outros integrantes:
-
-- **Kauan** cuida do banco Oracle (modelagem, DDL, procedures)
-- **João Vitor** faz o app mobile em React Native e o deploy na Azure
-
-## O que essa API faz
-
-CRUD completo de 6 entidades:
-
-- `Tutor` — quem é responsável pelo pet
-- `Pet` — o animal em si
-- `Clinica` — onde os atendimentos acontecem
-- `Consulta` — visita veterinária
-- `Vacina` — registro de vacinação
-- `Medicamento` — prescrição/tratamento
-
-Cada uma tem GET, POST, PUT e DELETE, mais umas rotas extras (tipo "lista todas as vacinas desse pet" ou "me dá o histórico completo desse animal").
-
-## Tecnologias
-
-.NET 10 com ASP.NET Core, Entity Framework Core 10, Oracle 19c (banco da FIAP) e Swagger pra documentação. Tudo Code-First — a estrutura das tabelas é definida pelas classes do C# e o EF Core gera o SQL.
+> 📺 **Vídeo da entrega no YouTube:** [SUBSTITUIR_PELO_LINK_DO_VIDEO]
+> 🌐 **API rodando em nuvem (durante a banca):** `http://4.168.192.201:8080/swagger`
 
 ---
 
-# Como instalar e executar
+## Sumário
 
-> ⚠️ **Importante:** Esta API usa **Code-First com EF Core Migrations**. Isso significa que **você não precisa criar tabela nenhuma manualmente** — o próprio EF cria toda a estrutura do banco pra você no Passo 4.
-
-## Pré-requisitos
-
-Você precisa ter instalado:
-
-1. **.NET 10 SDK** — baixe em https://dotnet.microsoft.com/download
-2. **Acesso a um banco Oracle** — pode ser:
-   - Oracle da FIAP (`oracle.fiap.com.br:1521/ORCL`) com seu usuário/senha de aluno
-   - Oracle XE local (`localhost:1521/XEPDB1`)
-   - Qualquer outra instância Oracle 19c+ que você tenha acesso
-
-Pra conferir se o .NET tá instalado, abre o PowerShell e roda:
-
-```powershell
-dotnet --version
-```
-
-Tem que aparecer algo tipo `10.0.x`.
+- [O projeto PetCare 360](#o-projeto-petcare-360)
+- [Benefícios para o negócio](#benefícios-para-o-negócio)
+- [Arquitetura macro](#arquitetura-macro)
+- [Como funciona por dentro](#como-funciona-por-dentro)
+- [Rotas da API](#rotas-da-api)
+- [Como rodar (How To)](#como-rodar-how-to)
+  - [Opção 1 — Rodar localmente com Docker Compose](#opção-1--rodar-localmente-com-docker-compose)
+  - [Opção 2 — Reproduzir nossa entrega em nuvem (Azure)](#opção-2--reproduzir-nossa-entrega-em-nuvem-azure)
+- [Script Azure CLI](#script-azure-cli)
+- [Dockerfile e Docker Compose](#dockerfile-e-docker-compose)
+- [O grupo](#o-grupo)
 
 ---
 
-## Passo 1 — Clonar o repositório
+## O projeto PetCare 360
 
-```powershell
-git clone https://github.com/MurilloFernandesCarapia/Challenge.NET.git
-cd Challenge.NET
-```
+O PetCare 360 nasceu de uma dor que qualquer dono de pet conhece: hoje a saúde do bicho vive aos pedaços. Tutor vai na clínica só quando o pet adoece, esquece quando foi a última vacina, perde a carteirinha, troca de clínica e o histórico fica perdido no caminho. Cada clínica tem o seu sistema, cada veterinário anota do seu jeito, e quem fica no prejuízo é o animal.
 
-## Passo 2 — Instalar a ferramenta do EF Core (uma vez só na sua máquina)
+Nossa proposta é centralizar **tutor, pet, clínica, consultas, vacinas e medicamentos** em um lugar só. Essa API é o núcleo de cadastro de todo esse domínio — antes de qualquer informação chegar no aplicativo do tutor ou no painel da clínica, ela passa por aqui.
 
-Essa ferramenta é o que aplica as migrations no banco. Se você nunca usou EF antes, roda isso:
+A API expõe **CRUD completo de 6 entidades** (Tutor, Pet, Clínica, Consulta, Vacina e Medicamento), além de rotas de consulta cruzada — tipo "me dá o histórico completo desse animal" ou "lista todas as vacinas que o Rex tomou".
 
-```powershell
-dotnet tool install --global dotnet-ef
-```
+## Benefícios para o negócio
 
-Se já tem instalado, ele vai dizer "tool already installed", o que é normal. **Feche e reabra o PowerShell** depois desse comando pra atualizar o PATH.
+A solução foi pensada pra atender três stakeholders ao mesmo tempo:
 
-Pra confirmar que funcionou:
+**Para o tutor:** acaba a história de carteirinha perdida e vacina vencida sem aviso. O histórico do pet fica num lugar só, acessível de qualquer lugar, mesmo que ele troque de clínica.
 
-```powershell
-dotnet ef --version
-```
+**Para a clínica veterinária:** quando o pet chega pra atendimento, o veterinário já tem o histórico inteiro na tela. Vacinas anteriores, medicações em curso, diagnósticos passados — tudo isso reduz drasticamente o tempo de anamnese e a chance de erro clínico (prescrever algo que conflita com medicação em uso, por exemplo).
 
-## Passo 3 — Configurar suas credenciais do Oracle
+**Para a CLYVO VET (cliente do Challenge):** abre a possibilidade de uma rede integrada de clínicas parceiras, com dados centralizados. Isso vira inteligência de mercado: dá pra entender padrões regionais de doença, sazonalidade de atendimentos, lacunas de cobertura vacinal — e a partir daí desenhar produtos e campanhas direcionadas.
 
-Abre o arquivo `PetCare360.API/appsettings.json` e edita a connection string com **suas credenciais**:
+**Para o time de DevOps (entrega desta disciplina):** ao colocar tudo em containers, o ambiente vira reprodutível. Qualquer pessoa do time clona o repo, roda **um comando** e tem a aplicação inteira de pé — mesma versão do .NET, mesma versão do Oracle, mesmo schema. Acaba o "na minha máquina funciona". E ao subir na Azure, deixamos de depender do servidor da faculdade pra ter o sistema no ar.
 
-```json
-{
-  "ConnectionStrings": {
-    "OracleConnection": "User Id=SEU_USUARIO;Password=SUA_SENHA;Data Source=oracle.fiap.com.br:1521/ORCL;"
-  }
-}
-```
+## Arquitetura macro
 
-Substitua:
-- `SEU_USUARIO` pelo seu usuário Oracle (ex: o seu RM da FIAP)
-- `SUA_SENHA` pela sua senha
-- `Data Source` se você usa outro servidor (ex: `localhost:1521/XEPDB1` pro Oracle XE local)
-
-> 💡 Se o banco que você vai apontar tiver outras tabelas com nomes começando com `TB_` (TB_TUTOR, TB_PET, etc), apague elas antes — o EF vai criar tudo do zero.
-
-## Passo 4 — Criar as tabelas no banco (aplicar as migrations)
-
-Esse é o passo mágico. Roda na raiz do projeto:
-
-```powershell
-dotnet ef database update --project PetCare360.API
-```
-
-O que esse comando faz:
-
-1. Conecta no Oracle usando as credenciais do `appsettings.json`
-2. Cria a tabela de controle `__EFMigrationsHistory`
-3. Executa as 2 migrations existentes (`InitialCreate` e `AjusteModelo`)
-4. Resultado: **6 tabelas criadas** com chaves estrangeiras, índices e constraints prontos:
-   - `TB_TUTOR`, `TB_PET`, `TB_CLINICA`, `TB_CONSULTA`, `TB_VACINA`, `TB_MEDICAMENTO`
-
-Se rodar sem erros, tá tudo pronto. Se der erro de conexão, confere as credenciais do Passo 3.
-
-## Passo 5 — Restaurar pacotes e rodar a API
-
-```powershell
-dotnet restore
-dotnet run --project PetCare360.API
-```
-
-O console vai mostrar algo tipo:
+Para o desenho detalhado em alta resolução (feito no Draw.io), veja **[`docs/arquitetura.png`](docs/arquitetura.png)**. Aqui vai uma versão textual da mesma ideia:
 
 ```
-Now listening on: http://localhost:5260
-Now listening on: https://localhost:7031
+┌──────────────────┐         HTTP/8080           ┌─────────────────────────────────────────┐
+│                  │ ──────────────────────────▶ │       Azure VM (Ubuntu 24.04 LTS)       │
+│  Cliente / App   │                             │           IP: 4.168.192.201             │
+│  (Postman,       │                             │                                         │
+│   navegador,     │ ◀────────────────────────── │  ┌───────────────────────────────────┐  │
+│   Swagger UI)    │         JSON response       │  │     Docker Engine + Compose        │  │
+│                  │                             │  │  ┌────────────────────────────┐   │  │
+└──────────────────┘                             │  │  │  Container: petcare-api    │   │  │
+                                                 │  │  │  ─────────────────────     │   │  │
+                                                 │  │  │  ASP.NET Core 10           │   │  │
+                                                 │  │  │  EF Core 10                │   │  │
+                                                 │  │  │  Usuário: appuser (non-root)│   │  │
+                                                 │  │  │  Porta: 8080               │   │  │
+                                                 │  │  └────────────┬───────────────┘   │  │
+                                                 │  │               │ TCP/1521          │  │
+                                                 │  │               ▼ (rede interna)    │  │
+                                                 │  │  ┌────────────────────────────┐   │  │
+                                                 │  │  │ Container: petcare-oracle  │   │  │
+                                                 │  │  │ ─────────────────────────  │   │  │
+                                                 │  │  │ gvenzl/oracle-xe:21-slim   │   │  │
+                                                 │  │  │ Schema: APP_USER           │   │  │
+                                                 │  │  │ PDB: XEPDB1                │   │  │
+                                                 │  │  │ Healthcheck habilitado     │   │  │
+                                                 │  │  └────────────┬───────────────┘   │  │
+                                                 │  │               │                   │  │
+                                                 │  │               ▼                   │  │
+                                                 │  │      ╔═══════════════════╗        │  │
+                                                 │  │      ║  Volume nomeado:  ║        │  │
+                                                 │  │      ║ petcare_oracle_data║       │  │
+                                                 │  │      ║  (persistência)   ║        │  │
+                                                 │  │      ╚═══════════════════╝        │  │
+                                                 │  └───────────────────────────────────┘  │
+                                                 │                                         │
+                                                 │  Network Security Group:                │
+                                                 │   ├─ Porta 22  (SSH)                    │
+                                                 │   ├─ Porta 8080 (API/Swagger pública)   │
+                                                 │   └─ Porta 1521 (Oracle, externo)       │
+                                                 └─────────────────────────────────────────┘
 ```
 
-Abre o navegador em uma dessas URLs adicionando `/swagger`:
+## Como funciona por dentro
 
-- **HTTP:** http://localhost:5260/swagger
-- **HTTPS:** https://localhost:7031/swagger
+O fluxo de subida da aplicação (do `docker compose up` até a API atender uma requisição) acontece nessa ordem:
 
-Pronto, o Swagger tá aberto e você pode testar todos os endpoints.
+1. **Docker Compose** lê o `docker-compose.yml` e identifica dois serviços (`oracle-db` e `api`) mais um volume nomeado (`petcare_oracle_data`).
+2. O container **`oracle-db`** sobe primeiro. Na primeira vez ele inicializa o Oracle XE 21c, cria o usuário `APP_USER` no PDB `XEPDB1` e roda um healthcheck a cada 30s pra avisar quando estiver pronto.
+3. O container **`api`** só começa a subir quando o healthcheck do banco fica verde (`depends_on: condition: service_healthy`).
+4. Quando a API sobe, o `Program.cs` tenta aplicar as **migrations do Entity Framework Core**. Como o Oracle às vezes demora pra responder mesmo após o healthcheck, há um **retry loop** de até 30 tentativas com 10s de intervalo entre elas.
+5. Aplicadas as migrations, o `SeedData.cs` popula o banco com **12 registros iniciais** (2 tutores, 2 clínicas, 2 pets, 2 consultas, 2 vacinas, 2 medicamentos). Esse passo é idempotente — só roda se as tabelas estão vazias.
+6. O Kestrel escuta na porta `8080` dentro do container, que é mapeada pra porta `8080` da VM Azure pelo Docker.
+7. O Swagger fica disponível em `/swagger` independente do environment — assim o professor consegue testar tudo pelo IP público.
 
----
+## Rotas da API
 
-# Como testar no Swagger (roteiro pra demonstrar tudo funcionando)
-
-Segue essa ordem pra ver a API funcionando ponta-a-ponta. Os IDs retornados nos POSTs (1, 2, 3...) você usa nos passos seguintes.
-
-### 1. Criar um tutor — `POST /api/Tutores`
-
-```json
-{
-  "nmTutor": "Murillo Silva",
-  "cpf": "123.456.789-00",
-  "email": "murillo@email.com",
-  "telefone": "(11) 99999-1111",
-  "endereco": "Rua dos Pets, 360"
-}
-```
-
-### 2. Criar uma clínica — `POST /api/Clinicas`
-
-```json
-{
-  "nmClinica": "Clínica Pet Center",
-  "cnpj": "12.345.678/0001-99",
-  "endereco": "Av. Paulista, 1500",
-  "telefone": "(11) 3000-0001",
-  "email": "contato@petcenter.com"
-}
-```
-
-### 3. Criar um pet (usando o `idTutor` do passo 1) — `POST /api/Pets`
-
-```json
-{
-  "nmPet": "Rex",
-  "especie": "Cachorro",
-  "raca": "Labrador",
-  "dtNascimento": "2020-05-10T00:00:00",
-  "peso": 28.5,
-  "idTutor": 1
-}
-```
-
-### 4. Criar uma consulta — `POST /api/Consultas`
-
-```json
-{
-  "dtConsulta": "2026-05-20T14:00:00",
-  "descricao": "Consulta de rotina",
-  "diagnostico": "Pet saudável",
-  "idPet": 1,
-  "idClinica": 1
-}
-```
-
-### 5. Cadastrar uma vacina — `POST /api/Vacinas`
-
-```json
-{
-  "nmVacina": "V10",
-  "fabricante": "Zoetis",
-  "dtAplicacao": "2026-05-20T00:00:00",
-  "dtProximaDose": "2027-05-20T00:00:00",
-  "idPet": 1,
-  "idConsulta": 1
-}
-```
-
-### 6. Cadastrar um medicamento — `POST /api/Medicamentos`
-
-```json
-{
-  "nmMedicamento": "Vermífugo",
-  "dosagem": "1 comprimido",
-  "frequencia": "A cada 6 meses",
-  "dtInicio": "2026-05-20T00:00:00",
-  "dtFim": "2026-05-20T00:00:00",
-  "idPet": 1,
-  "idConsulta": 1
-}
-```
-
-### 7. Ver o histórico completo do pet — `GET /api/Pets/1/historico`
-
-Esse endpoint traz o pet com **todas as consultas, vacinas e medicamentos** juntos. É o coração da API.
-
-### 8. Testar erros propositais (mostra que as validações funcionam)
-
-- `GET /api/Tutores/999` → retorna **404 NotFound** ("Tutor não encontrado")
-- `POST /api/Pets` com `idTutor: 999` (tutor inexistente) → retorna **400 BadRequest**
-- `DELETE /api/Tutores/1` (tutor com pets vinculados) → retorna **erro** porque a regra de FK proíbe deletar tutores que têm pets cadastrados
-
----
-
-# Prints do Swagger
-
-Pra ter uma ideia do que esperar antes de rodar, segue como a interface fica:
-
-### Visão geral — tela inicial do Swagger
-
-Logo que abre `/swagger`, os 6 grupos de entidades aparecem agrupados, cada um listando seus endpoints (GET/POST/PUT/DELETE):
-
-![Swagger — visão da home com endpoints agrupados](docs/screenshots/swagger-home.png)
-
-### Página completa — endpoints + Schemas
-
-A página inteira incluindo a seção **Schemas** no final, que mostra a estrutura JSON de cada entidade (Clinica, Consulta, Medicamento, Pet, Tutor, Vacina, ProblemDetails):
-
-![Swagger — página completa com Schemas](docs/screenshots/swagger-full-page.png)
-
----
-
-# Endpoints disponíveis
-
-A documentação interativa completa está no Swagger depois de rodar a aplicação. Resumo das rotas:
+A documentação completa e interativa fica no **Swagger** em `/swagger` depois de subir a aplicação. Resumo das rotas (33 endpoints no total):
 
 ### Tutores — `/api/Tutores`
 - `GET /api/Tutores` — lista todos
@@ -283,31 +136,21 @@ A documentação interativa completa está no Swagger depois de rodar a aplicaç
 - `GET /api/Consultas/{id}` — busca por ID
 - `GET /api/Consultas/pet/{petId}` — consultas de um pet
 - `GET /api/Consultas/clinica/{clinicaId}` — consultas de uma clínica
-- `POST /api/Consultas` — cria
-- `PUT /api/Consultas/{id}` — atualiza
-- `DELETE /api/Consultas/{id}` — remove
+- `POST /api/Consultas`, `PUT`, `DELETE`
 
 ### Vacinas — `/api/Vacinas`
 - `GET /api/Vacinas` — lista todas
 - `GET /api/Vacinas/{id}` — busca por ID
 - `GET /api/Vacinas/pet/{petId}` — vacinas de um pet
-- `POST /api/Vacinas` — cria
-- `PUT /api/Vacinas/{id}` — atualiza
-- `DELETE /api/Vacinas/{id}` — remove
+- `POST /api/Vacinas`, `PUT`, `DELETE`
 
 ### Medicamentos — `/api/Medicamentos`
 - `GET /api/Medicamentos` — lista todos
 - `GET /api/Medicamentos/{id}` — busca por ID
 - `GET /api/Medicamentos/pet/{petId}` — medicamentos de um pet
-- `POST /api/Medicamentos` — cria
-- `PUT /api/Medicamentos/{id}` — atualiza
-- `DELETE /api/Medicamentos/{id}` — remove
+- `POST /api/Medicamentos`, `PUT`, `DELETE`
 
-**Total: 33 endpoints** (14 GETs + 6 POSTs + 6 PUTs + 6 DELETEs + 1 histórico).
-
----
-
-# Como os dados se ligam
+### Relacionamento entre as entidades
 
 ```
 TB_TUTOR (1) ─────┐
@@ -320,69 +163,173 @@ TB_PET (1) ──┬──→ TB_CONSULTA (N) ←── TB_CLINICA (1)
              └──→ TB_MEDICAMENTO (N)
 ```
 
-Regras de integridade que ficaram explícitas no banco:
-
-- Não dá pra apagar um tutor que ainda tem pets cadastrados (apaga os pets primeiro)
-- Não dá pra apagar uma clínica que tem histórico de consultas (preserva histórico)
-- CPF e email do tutor são únicos no sistema
-- CNPJ da clínica é único
-
 ---
 
-# Estrutura do código
+## Como rodar (How To)
 
+Existem duas formas de pôr esse projeto pra rodar. A primeira é rodar local na sua máquina (útil pra desenvolvimento e teste). A segunda é reproduzir o que entregamos: a solução completa rodando em uma VM Azure provisionada via script.
+
+### Opção 1 — Rodar localmente com Docker Compose
+
+**Pré-requisitos:** Docker Desktop (Windows/Mac) ou Docker Engine + Compose plugin (Linux). Mais nada — não precisa de .NET SDK instalado, não precisa de Oracle instalado, é tudo conteinerizado.
+
+**Passos:**
+
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/MurilloFernandesCarapia/aa.git
+   cd aa
+   ```
+
+2. Suba os containers:
+   ```bash
+   docker compose up -d
+   ```
+
+3. Acompanhe os logs (a primeira subida demora ~5 minutos por causa do download das imagens e da inicialização do Oracle):
+   ```bash
+   docker compose logs -f
+   ```
+
+   Quando aparecer `[startup] Banco pronto: migrations aplicadas e seed carregado.` nos logs da API, está tudo de pé. Pode dar `Ctrl+C` pra sair dos logs (o container continua rodando em background).
+
+4. Abre o Swagger no navegador:
+   ```
+   http://localhost:8080/swagger
+   ```
+
+5. Pra derrubar tudo:
+   ```bash
+   docker compose down
+   ```
+
+   Se quiser apagar inclusive o volume com os dados do banco:
+   ```bash
+   docker compose down -v
+   ```
+
+### Opção 2 — Reproduzir nossa entrega em nuvem (Azure)
+
+Esse é o caminho que usamos pra entrega. Provisiona uma VM Linux na Azure, instala o Docker, clona o repositório e sobe a aplicação. Pré-requisito: ter uma assinatura Azure ativa (qualquer uma — pessoal, Students, Pay-as-you-go).
+
+**Passo 1: criar a VM e configurar a rede**
+
+A criação foi feita pelo portal Azure com esses parâmetros:
+
+| Parâmetro | Valor |
+|---|---|
+| Resource Group | `PetCare360_group` |
+| VM Name | `PetCare360` |
+| Region | Brazil South |
+| Image | Ubuntu Server 24.04 LTS (Noble Numbat) — x64 Gen2 |
+| Size | Standard_D2s_v3 (2 vCPU, 8 GB RAM) |
+| Auth | Senha (username `rm564969`) |
+| Inbound Ports abertas | 22 (SSH), 8080 (API), 1521 (Oracle) |
+
+A versão equivalente em comandos `az` está em [`scripts/infra.sh`](scripts/infra.sh). Os mesmos resultados são alcançados pelo portal — basta criar a VM com a configuração acima e abrir as portas 8080 e 1521 nas regras de entrada do Network Security Group.
+
+**Passo 2: conectar via SSH na VM**
+
+No PowerShell (ou qualquer terminal com OpenSSH):
+
+```bash
+ssh rm564969@4.168.192.201
 ```
-Challenge.NET/
-├── PetCare360.API/
-│   ├── Controllers/                ← 6 endpoints (Tutores, Pets, Clinicas, Consultas, Vacinas, Medicamentos)
-│   ├── Models/                     ← classes do domínio (Tutor, Pet, Clinica, Consulta, Vacina, Medicamento)
-│   ├── Data/
-│   │   └── AppDbContext.cs         ← configuração do EF Core (Fluent API + relacionamentos)
-│   ├── Migrations/                 ← histórico de mudanças no banco
-│   │   ├── 20260512232200_InitialCreate.cs
-│   │   └── 20260520025529_AjusteModelo.cs
-│   ├── Properties/
-│   │   └── launchSettings.json     ← perfis de execução (http/https)
-│   ├── Program.cs                  ← entrada e configuração da API
-│   ├── appsettings.json            ← config (connection string Oracle)
-│   └── PetCare360.API.csproj       ← dependências do projeto
-├── docs/
-│   └── screenshots/                ← prints do Swagger pra documentação
-├── .gitignore
-├── PetCare360.API.slnx             ← solução .NET
-└── README.md                       ← este arquivo
+
+**Passo 3: instalar Docker + Git na VM**
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git nano curl ca-certificates gnupg lsb-release
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
 ```
 
+Sai da VM com `exit` e entra de novo (`ssh rm564969@4.168.192.201`) pra que o grupo `docker` faça efeito.
+
+**Passo 4: clonar o repositório e subir a aplicação**
+
+```bash
+git clone https://github.com/MurilloFernandesCarapia/aa.git
+cd aa
+docker compose up -d
+```
+
+**Passo 5: acompanhar os logs até o banco ficar pronto**
+
+```bash
+docker compose logs -f api
+```
+
+Aguarde aparecer `[startup] Banco pronto: migrations aplicadas e seed carregado.` — quando aparecer, sua API está respondendo.
+
+**Passo 6: acessar o Swagger**
+
+No navegador (qualquer máquina, qualquer rede):
+```
+http://4.168.192.201:8080/swagger
+```
+
+**Passo 7: ao final da entrega, deletar tudo (obrigatório)**
+
+```bash
+az group delete --name PetCare360_group --yes --no-wait
+```
+
+Esse comando apaga a VM, o IP público, o disco, o NSG, a VNet — tudo de uma vez. Os créditos da assinatura param de ser consumidos imediatamente.
+
 ---
 
-# Resolução de problemas comuns
+## Script Azure CLI
 
-**"dotnet-ef" não é reconhecido como comando**
-> Você não instalou o tool. Volte ao Passo 2.
+O script `scripts/infra.sh` automatiza tudo da Opção 2 acima (provisionamento da VM, abertura de portas, instalação de Docker, clone do repo e deploy). É executável pelo **Azure Cloud Shell** ou por qualquer máquina com Azure CLI instalado e autenticado.
 
-**Erro `ORA-12541: TNS:no listener` ou `ORA-12170: TNS:Connect timeout`**
-> A connection string tá errada ou o servidor Oracle não tá acessível. Confere o `Data Source` no `appsettings.json`.
+Para executar:
 
-**Erro `ORA-01017: invalid username/password`**
-> Usuário ou senha errados no `appsettings.json`. Confere as credenciais.
+```bash
+az login
+chmod +x scripts/infra.sh
+./scripts/infra.sh
+```
 
-**Erro `ORA-00955: name is already used by an existing object`**
-> O banco já tem alguma tabela com nome conflitante (`TB_PET`, `TB_TUTOR`, etc). Apaga elas no banco antes de rodar as migrations.
-
-**Swagger abre mas dá 500 ao testar endpoints**
-> Você esqueceu de rodar `dotnet ef database update` no Passo 4. Sem isso as tabelas não existem.
-
-**A página `/swagger` dá 404**
-> O perfil de execução tá em produção. Garanta que `ASPNETCORE_ENVIRONMENT` esteja como `Development` (o `launchSettings.json` do projeto já faz isso por padrão).
+Ao final da execução o script imprime o IP público da VM e a URL completa do Swagger.
 
 ---
 
-# Sobre o projeto
+## Dockerfile e Docker Compose
 
-Esse é um trabalho de faculdade do meu 2º ano de ADS. Não é production-ready — não tem autenticação, rate limiting, cache distribuído, nada disso. O foco era demonstrar domínio dos conceitos da matéria de **Advanced Business Development with .NET** (Web API, EF Core, Oracle, REST, OpenAPI).
+O projeto traz dois arquivos centrais na raiz do repositório:
 
-Se você é o professor avaliando isso: bem-vindo, espero ter feito direito 😄
+**[`Dockerfile`](Dockerfile)** — multi-stage build em duas etapas:
+1. **Build stage** com `mcr.microsoft.com/dotnet/sdk:10.0` que faz `dotnet restore` e `dotnet publish` em modo Release.
+2. **Runtime stage** com `mcr.microsoft.com/dotnet/aspnet:10.0` (imagem ~220MB) que cria um usuário **não-root** (`appuser`, UID 1000), copia os binários publicados e roda a aplicação.
+
+A imagem final pesa ~250MB, expõe a porta 8080 e executa **sem privilégios de root** — atende a exigência do enunciado sobre rodar a aplicação como usuário sem privilégios administrativos.
+
+**[`docker-compose.yml`](docker-compose.yml)** — orquestra os dois containers:
+- `oracle-db` usa a imagem oficial `gvenzl/oracle-xe:21-slim`, com healthcheck e variáveis de ambiente que criam o schema `APP_USER` automaticamente.
+- `api` faz build do Dockerfile local, espera o healthcheck do banco passar (`depends_on: condition: service_healthy`) e recebe a connection string via variável de ambiente — sem nada hardcoded no código.
+- `volumes.oracle_data` — **volume nomeado** (`petcare_oracle_data`) que garante persistência dos dados do banco entre restarts dos containers. Mesmo se você der `docker compose down` e `up` de novo, os dados continuam lá.
+- `networks.petcare-net` — rede bridge interna que permite à API resolver o banco pelo nome `oracle-db` em vez de IP.
 
 ---
 
-Murillo · 2TDSPW · FIAP · Maio de 2026
+## O grupo
+
+| Nome | RM | Turma |
+|---|---|---|
+| Murillo Fernandes Carapia | RM564969 | 2TDSPW |
+| Kauan Vieira de Lima | RM565403 | 2TDSPW |
+| João Vitor Lacerda | RM565565 | 2TDSPW |
+
+---
+
+**FIAP · 2TDSPW · Challenge 2026 · 1º Sprint DevOps Tools & Cloud Computing**
+
+*Em parceria com a CLYVO VET*
