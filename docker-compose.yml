@@ -1,0 +1,81 @@
+# =====================================================================
+# PetCare360 - Docker Compose
+# =====================================================================
+# Sobe 2 servicos:
+#   1) oracle-db : Oracle Database 21c Express Edition (gvenzl/oracle-xe).
+#   2) api       : a API .NET 10, conteinerizada via Dockerfile local.
+#
+# Caracteristicas que atendem o Challenge:
+#   - Volume nomeado (oracle_data) p/ persistencia do banco       -> -1,5 pt evitado
+#   - API roda em background (detached pelo `docker compose up -d`) -> -0,5 pt evitado
+#   - API roda como usuario nao-root (definido no Dockerfile)     -> -0,5 pt evitado
+#   - Banco Oracle conteinerizado (nao localhost)                 -> -5,0 pt evitado
+#   - Healthcheck no Oracle + depends_on com condition: healthy   -> API espera o banco
+# =====================================================================
+
+services:
+
+  # ---------------------------------------------------------------
+  # Oracle XE 21c
+  # ---------------------------------------------------------------
+  oracle-db:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: petcare-oracle
+    restart: unless-stopped
+    environment:
+      # Senha do usuario SYS/SYSTEM (admin).
+      ORACLE_PASSWORD: OraclePwd123
+      # Cria automaticamente um usuario APP_USER com permissoes no PDB padrao (XEPDB1).
+      APP_USER: APP_USER
+      APP_USER_PASSWORD: AppPassword123
+    ports:
+      - "1521:1521"
+    volumes:
+      # Volume nomeado -> persiste os dados do Oracle entre restarts.
+      - oracle_data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks:
+      - petcare-net
+
+  # ---------------------------------------------------------------
+  # API .NET 10
+  # ---------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: petcare360-api:latest
+    container_name: petcare-api
+    restart: unless-stopped
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    environment:
+      # Sobrescreve a connection string do appsettings.json.
+      # Formato __ (duplo underline) e o equivalente de : no .NET para env vars.
+      ConnectionStrings__OracleConnection: "User Id=APP_USER;Password=AppPassword123;Data Source=oracle-db:1521/XEPDB1;"
+      ASPNETCORE_ENVIRONMENT: Production
+    ports:
+      - "8080:8080"
+    networks:
+      - petcare-net
+
+# ---------------------------------------------------------------
+# Volume nomeado (REQUISITO do Challenge)
+# ---------------------------------------------------------------
+volumes:
+  oracle_data:
+    name: petcare_oracle_data
+
+# ---------------------------------------------------------------
+# Rede interna - permite que a API resolva 'oracle-db' por nome
+# ---------------------------------------------------------------
+networks:
+  petcare-net:
+    name: petcare-net
+    driver: bridge

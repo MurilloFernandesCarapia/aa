@@ -1,0 +1,46 @@
+# =====================================================================
+# .dockerignore - exclui arquivos/pastas do contexto enviado ao Docker.
+# Resultado: builds mais rapidos, imagens menores, sem dados sensiveis.
+# =====================================================================
+
+# Build artifacts do .NET
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# Visual Studio / Rider / VS Code
+**/.vs/
+**/.idea/
+**/.vscode/
+**/*.user
+**/*.suo
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker (recursivo nao copia ele mesmo, mas evita confusao)
+**/docker-compose*.yml
+**/Dockerfile*
+**/.dockerignore
+
+# Arquivos locais / sensiveis
+**/appsettings.Local.json
+**/appsettings.Development.json
+**/.env
+**/.env.*
+**/secrets.json
+
+# Logs e temporarios
+**/*.log
+**/*.tmp
+**/Thumbs.db
+**/.DS_Store
+
+# Documentacao do repo (nao precisa dentro do container)
+README.md
+LICENSE
+docs/
+*.md

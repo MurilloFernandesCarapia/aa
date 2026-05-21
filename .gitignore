@@ -1,41 +1,61 @@
+# =====================================================================
+# .gitignore - PetCare360 DevOps Challenge
+# =====================================================================
 
-bin/
-obj/
+## Build do .NET
+**/bin/
+**/obj/
+**/out/
+**/publish/
+**/Debug/
+**/Release/
+
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.suo
 *.user
+*.userprefs
 *.userosscache
 *.sln.docstates
-*.dll
-*.pdb
-*.exe
 
+## Arquivos sensiveis / locais
+appsettings.Local.json
+appsettings.*.Local.json
+.env
+.env.*
+secrets.json
+**/secrets/
 
-.vs/
-*.suo
-*.cache
-*.opensdf
-*.sdf
-*.unsuccessfulbuild
+## Caches NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
 
-
-.idea/
-
-
-.vscode/
-.claude/
-
-
+## Logs
 *.log
 logs/
+*.tlog
+*.tmp
 
-.DS_Store
+## Sistema operacional
 Thumbs.db
+ehthumbs.db
 Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
 
+## ReSharper / dotCover
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+*.dotCover
 
-secrets.json
-*.pfx
-*.snk
-
-
-publish/
-artifacts/
+## Outros temporarios
+*.swp
+*~
