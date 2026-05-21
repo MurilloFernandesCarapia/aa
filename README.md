@@ -47,47 +47,8 @@ A solução foi pensada pra atender três stakeholders ao mesmo tempo:
 
 ## Arquitetura macro
 
-Para o desenho detalhado em alta resolução (feito no Draw.io), veja **[`docs/arquitetura.png`](docs/arquitetura.png)**. Aqui vai uma versão textual da mesma ideia:
+![Arquitetura](https://raw.githubusercontent.com/MurilloFernandesCarapia/aa/main/arquiteturamacro/arquitetura.jpg)
 
-```
-┌──────────────────┐         HTTP/8080           ┌─────────────────────────────────────────┐
-│                  │ ──────────────────────────▶ │       Azure VM (Ubuntu 24.04 LTS)       │
-│  Cliente / App   │                             │           IP: 4.168.192.201             │
-│  (Postman,       │                             │                                         │
-│   navegador,     │ ◀────────────────────────── │  ┌───────────────────────────────────┐  │
-│   Swagger UI)    │         JSON response       │  │     Docker Engine + Compose        │  │
-│                  │                             │  │  ┌────────────────────────────┐   │  │
-└──────────────────┘                             │  │  │  Container: petcare-api    │   │  │
-                                                 │  │  │  ─────────────────────     │   │  │
-                                                 │  │  │  ASP.NET Core 10           │   │  │
-                                                 │  │  │  EF Core 10                │   │  │
-                                                 │  │  │  Usuário: appuser (non-root)│   │  │
-                                                 │  │  │  Porta: 8080               │   │  │
-                                                 │  │  └────────────┬───────────────┘   │  │
-                                                 │  │               │ TCP/1521          │  │
-                                                 │  │               ▼ (rede interna)    │  │
-                                                 │  │  ┌────────────────────────────┐   │  │
-                                                 │  │  │ Container: petcare-oracle  │   │  │
-                                                 │  │  │ ─────────────────────────  │   │  │
-                                                 │  │  │ gvenzl/oracle-xe:21-slim   │   │  │
-                                                 │  │  │ Schema: APP_USER           │   │  │
-                                                 │  │  │ PDB: XEPDB1                │   │  │
-                                                 │  │  │ Healthcheck habilitado     │   │  │
-                                                 │  │  └────────────┬───────────────┘   │  │
-                                                 │  │               │                   │  │
-                                                 │  │               ▼                   │  │
-                                                 │  │      ╔═══════════════════╗        │  │
-                                                 │  │      ║  Volume nomeado:  ║        │  │
-                                                 │  │      ║ petcare_oracle_data║       │  │
-                                                 │  │      ║  (persistência)   ║        │  │
-                                                 │  │      ╚═══════════════════╝        │  │
-                                                 │  └───────────────────────────────────┘  │
-                                                 │                                         │
-                                                 │  Network Security Group:                │
-                                                 │   ├─ Porta 22  (SSH)                    │
-                                                 │   ├─ Porta 8080 (API/Swagger pública)   │
-                                                 │   └─ Porta 1521 (Oracle, externo)       │
-                                                 └─────────────────────────────────────────┘
 ```
 
 ## Como funciona por dentro
@@ -118,7 +79,7 @@ A documentação completa e interativa fica no **Swagger** em `/swagger` depois 
 - `GET /api/Pets/{id}` — busca por ID
 - `GET /api/Pets/tutor/{tutorId}` — lista pets de um tutor
 - `GET /api/Pets/especie/{especie}` — filtra por espécie
-- `GET /api/Pets/{id}/historico` — pet + consultas + vacinas + medicamentos ⭐
+- `GET /api/Pets/{id}/historico` — pet + consultas + vacinas + medicamentos 
 - `POST /api/Pets` — cria
 - `PUT /api/Pets/{id}` — atualiza
 - `DELETE /api/Pets/{id}` — remove
@@ -166,47 +127,45 @@ TB_PET (1) ──┬──→ TB_CONSULTA (N) ←── TB_CLINICA (1)
 ---
 
 ## Como rodar (How To)
-
+ 
 Existem duas formas de pôr esse projeto pra rodar. A primeira é rodar local na sua máquina (útil pra desenvolvimento e teste). A segunda é reproduzir o que entregamos: a solução completa rodando em uma VM Azure provisionada via script.
-
+ 
 ### Opção 1 — Rodar localmente com Docker Compose
-
+ 
 **Pré-requisitos:** Docker Desktop (Windows/Mac) ou Docker Engine + Compose plugin (Linux). Mais nada — não precisa de .NET SDK instalado, não precisa de Oracle instalado, é tudo conteinerizado.
-
+ 
 **Passos:**
-
+ 
 1. Clone o repositório:
    ```bash
    git clone https://github.com/MurilloFernandesCarapia/aa.git
    cd aa
    ```
-
+ 
 2. Suba os containers:
    ```bash
    docker compose up -d
    ```
-
+ 
 3. Acompanhe os logs (a primeira subida demora ~5 minutos por causa do download das imagens e da inicialização do Oracle):
    ```bash
    docker compose logs -f
    ```
-
+ 
    Quando aparecer `[startup] Banco pronto: migrations aplicadas e seed carregado.` nos logs da API, está tudo de pé. Pode dar `Ctrl+C` pra sair dos logs (o container continua rodando em background).
-
 4. Abre o Swagger no navegador:
    ```
    http://localhost:8080/swagger
    ```
-
+ 
 5. Pra derrubar tudo:
    ```bash
    docker compose down
    ```
-
+ 
    Se quiser apagar inclusive o volume com os dados do banco:
    ```bash
    docker compose down -v
-   ```
 
 ### Opção 2 — Reproduzir nossa entrega em nuvem (Azure)
 
@@ -220,10 +179,10 @@ A criação foi feita pelo portal Azure com esses parâmetros:
 |---|---|
 | Resource Group | `PetCare360_group` |
 | VM Name | `PetCare360` |
-| Region | Brazil South |
+| Region | South Africa |
 | Image | Ubuntu Server 24.04 LTS (Noble Numbat) — x64 Gen2 |
 | Size | Standard_D2s_v3 (2 vCPU, 8 GB RAM) |
-| Auth | Senha (username `rm564969`) |
+| Auth | Senha (username `azureuser`) |
 | Inbound Ports abertas | 22 (SSH), 8080 (API), 1521 (Oracle) |
 
 A versão equivalente em comandos `az` está em [`scripts/infra.sh`](scripts/infra.sh). Os mesmos resultados são alcançados pelo portal — basta criar a VM com a configuração acima e abrir as portas 8080 e 1521 nas regras de entrada do Network Security Group.
